@@ -23,3 +23,19 @@ class StockroomTests(unittest.TestCase):
         stockroom.register_incoming('old', 's1', 'p1', 5, 10)
         with self.assertRaises(ValueError):
             stockroom.register_incoming('old', 's1', 'p1', 6, 10)
+
+    def test_committed_cost_accumulates_and_survives_receipt(self):
+        stockroom = Stockroom({})
+        stockroom.register_incoming('a', 's1', 'p1', 5, 10, committed_cost=10)
+        stockroom.register_incoming('b', 's1', 'p1', 3, 12, committed_cost=6)
+        self.assertEqual(stockroom.committed_cost(), 16)
+        stockroom.receive('a', 10)
+        # 到货只转库存，已占用预算不消失
+        self.assertEqual(stockroom.committed_cost(), 16)
+        with self.assertRaises(ValueError):
+            stockroom.register_incoming('c', 's1', 'p1', 2, 11, committed_cost=-1)
+        # 同单号幂等登记允许相同占用额
+        stockroom.register_incoming('a', 's1', 'p1', 5, 10, committed_cost=10)
+        self.assertEqual(stockroom.committed_cost(), 16)
+        with self.assertRaises(ValueError):
+            stockroom.register_incoming('a', 's1', 'p1', 5, 10, committed_cost=11)
